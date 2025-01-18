@@ -149,6 +149,7 @@ async def fagot(update: Update, context: CallbackContext):
 
 
 if __name__ == '__main__':
+    print(f"Текущая рабочая директория: {os.getcwd()}")
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     app = ApplicationBuilder().token(TOKEN).build()
 
