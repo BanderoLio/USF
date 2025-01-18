@@ -88,7 +88,7 @@ async def remove(update: Update, context: CallbackContext):
 async def catgirl(update: Update, context: CallbackContext):
     bot: Bot = context.bot
     await bot.send_photo(update.effective_chat.id,
-                         CatgirlDownloader.get_image())
+                         CatgirlDownloader.get_image(nsfw=True))
 
 
 async def jcat(update: Update, context: CallbackContext):
