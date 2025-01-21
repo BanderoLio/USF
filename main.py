@@ -2,6 +2,8 @@ import logging
 import random
 import datetime
 import os
+import json
+import pytz
 
 from functools import wraps
 from telegram import Update, Bot
@@ -88,7 +90,7 @@ async def remove(update: Update, context: CallbackContext):
 async def catgirl(update: Update, context: CallbackContext):
     bot: Bot = context.bot
     await bot.send_photo(update.effective_chat.id,
-                         CatgirlDownloader.get_image(nsfw=True))
+                         CatgirlDownloader.get_image(nsfw=False))
 
 
 async def jcat(update: Update, context: CallbackContext):
@@ -97,10 +99,46 @@ async def jcat(update: Update, context: CallbackContext):
                          CatgirlDownloader.get_cat())
 
 
+async def furry(update: Update, context: CallbackContext):
+    bot: Bot = context.bot
+    await bot.send_photo(update.effective_chat.id,
+                         CatgirlDownloader.get_furry())
+
+
+async def schedule_callback(update: Update, context: CallbackContext):
+    bot: Bot = context.bot
+    await bot.send_message(update.effective_chat.id,
+                           f'РАСПОРЯДОК ДНЯ ФОНАТА ЮСФ\n'
+                           f'{'\n'.join([' '.join(p) for p in schedule])}')
+
+
+async def whatsnow(update: Update, context: CallbackContext):
+    bot: Bot = context.bot
+
+    def find_pos(arr: list, key):
+        left, right = 0, len(arr) - 1
+        while left <= right:
+            mid = left + (right-left)//2
+            if key < arr[mid]:
+                right = mid - 1
+            else:
+                left = mid + 1
+
+        return left - 1
+
+    key = datetime.datetime.now(tz=pytz.timezone('Europe/Moscow'))
+    key = key.hour * 100 + key.minute
+    pos = find_pos([int(x[0].split(':')[0]) * 100 + int(x[0].split(':')[1])
+                    for x in schedule], key)
+    await bot.send_message(update.effective_chat.id, ' '.join(schedule[pos]))
+
+
 async def states_callback(update: Update, context: CallbackContext):
     id = update.effective_chat.id
     s = "\n".join(f'{i+1}. {state}' for i, state in enumerate(states(id)))
     max_len = MessageLimit.MAX_TEXT_LENGTH.value
+    await context.bot.send_message(chat_id=update.effective_chat.id,
+                                   text='Ну что, опять в копатель?')
     for i in range(len(s) // max_len + (1 if len(s) % max_len else 0)):
         await context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=s[i*max_len:min((i+1)*max_len,
@@ -122,8 +160,8 @@ async def state(update: Update, context: CallbackContext):
 
 
 async def info(update: Update, context: CallbackContext):
-    s = update.message.text
-    idx = s.find("инфа") + len("инфа") + 1
+    s = update.message.text.lstrip()
+    idx = len("инфа") + 1
     bot: Bot = context.bot
     s = f'🔮 Вероятность того, что {s[idx:] if idx < len(s) else ""}' \
         f' — {random.randint(0, 100)}%'
@@ -154,8 +192,10 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
 
     states = States()
-    # with open("states.json") as f:
-    #     states = json.load(f)
+
+    schedule = None
+    with open("schedule.json") as f:
+        schedule = json.load(f)
 
     start_handler = CommandHandler('start', start)
     info_handler = MessageHandler(filters.TEXT & (~filters.COMMAND)
@@ -166,6 +206,9 @@ if __name__ == '__main__':
     remove_handler = CommandHandler('remove', remove)
     catgirl_handler = CommandHandler('catty', catgirl)
     jcat_handler = CommandHandler('justcat', jcat)
+    furry_handler = CommandHandler('furry', furry)
+    schedule_handler = CommandHandler('USF_schedule', schedule_callback)
+    whatsnow_handler = CommandHandler('whatsnow', whatsnow)
 
     states_handler = CommandHandler('points', states_callback)
 
@@ -176,7 +219,7 @@ if __name__ == '__main__':
     state_handler = MessageHandler(filters.TEXT & ~filters.COMMAND
                                    & filters.Regex(r'^\d+$'), state)
 
-    hello_time = datetime.time(7)
+    hello_time = datetime.time(4)
 
     app.add_handler(start_handler)
     app.add_handler(info_handler)
@@ -184,6 +227,9 @@ if __name__ == '__main__':
     app.add_handler(remove_handler)
     app.add_handler(catgirl_handler)
     app.add_handler(jcat_handler)
+    app.add_handler(furry_handler)
+    app.add_handler(schedule_handler)
+    app.add_handler(whatsnow_handler)
     app.add_handler(states_handler)
     app.add_handler(ato_handler)
     app.add_handler(state_handler)
