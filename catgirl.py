@@ -35,8 +35,9 @@ class CatgirlDownloader:
 
     @staticmethod
     def get_furry():
-        s = f'https://furbooru.org/api/v1/json/images/{randint(1, 400000)}'
+        s = f'https://furbooru.org/api/v1/json/search/images' \
+            f'?per_page=1&page={randint(1, 24000)}&q=safe,female,oc+only'
         r = requests.get(s, timeout=15)
         page = json.loads(r.text)
-        url = page['image']['representations']['full']
+        url = page['images'][0]['representations']['full']
         return requests.get(url, timeout=15).content
