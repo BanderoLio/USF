@@ -4,6 +4,7 @@ import datetime
 import os
 import json
 import pytz
+import psycopg2
 
 from enum import Enum
 from functools import wraps
@@ -206,9 +207,10 @@ async def main_menu(update: Update, context: CallbackContext):
     return State.MENU
 
 
+@admin_only
 async def admin_menu(update: Update, context: CallbackContext):
     keyboard = [
-        [InlineKeyboardButton("NSFW Кошкодевочки",
+        [InlineKeyboardButton("Настройки",
                               callback_data=str(State.SETTINGS))]
     ]
     markup = InlineKeyboardMarkup(keyboard)
@@ -216,12 +218,11 @@ async def admin_menu(update: Update, context: CallbackContext):
     return State.MENU
 
 
-
 async def settings(update: Update, context: CallbackContext):
     q = update.callback_query
     await q.answer()
     keyboard = [
-        [InlineKeyboardButton("Change bool",
+        [InlineKeyboardButton("NSFW Кошкодевочки",
                               callback_data=str(State.CHANGE_MOD))]
     ]
     await q.edit_message_text("Z", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -229,12 +230,55 @@ async def settings(update: Update, context: CallbackContext):
 
 
 async def change(update: Update, context: CallbackContext):
-    await update.callback_query.answer()
-    print("STATE CHANGED ALERT)")
-    await update.callback_query.edit_message_text("Changed")
+    q = update.callback_query
+    await q.answer()
+    id = abs(update.effective_chat.id) // 100000
+    nsfw = True
+    try:
+        cursor.execute(f"SELECT catgirl_nsfw FROM ztable WHERE id = {id}")
+        nsfw = cursor.fetchone()
+    except Exception:
+        ...
+    nsfw = not nsfw
+    try:
+        cursor.execute(f"INSERT INTO ztable (id, catgirl_nsfw) VALUES"
+                             f"({id}, {nsfw}) ON CONFLICT (id) DO UPDATE SET"
+                             f" catgirl_nsfw = EXCLUDED.catgirl_nsfw",
+                            )
+        conn.commit()
+        await q.edit_message_text(f"Кошкодевочки++"
+                                  f"в{"" if nsfw else "ы"}ключены")
+    except psycopg2.Error as e:
+        conn.rollback()
+        print(f'Ошибка: {e}')
 
 
 if __name__ == '__main__':
+    dbname = os.getenv("POSTGRES_DB")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+    assert (dbname and user and password)
+
+    conn = psycopg2.connect(
+        dbname=dbname,
+        user=user,
+        password=password,
+        host='db',
+        port='5432'
+    )
+
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ztable (
+    id BIGSERIAL PRIMARY KEY,
+    points TEXT[] DEFAULT '{}',
+    catgirl_nsfw BOOLEAN NOT NULL DEFAULT FALSE
+    )
+""")
+
+    conn.commit()
+
     print(f"Текущая рабочая директория: {os.getcwd()}")
     # TOKEN = os.getenv('TELEGRAM_TOKEN')
     TOKEN = '7017664204:AAEH1oHU5hWDt4T-HdJu9Tp7a0g9ZMhRRaI'
@@ -290,11 +334,11 @@ if __name__ == '__main__':
         states={
             State.MENU: [
                 CallbackQueryHandler(settings,
-                                    pattern=f'^{str(State.SETTINGS)}$')
+                                     pattern=f'^{str(State.SETTINGS)}$')
             ],
             State.SETTINGS: [
                 CallbackQueryHandler(change,
-                                    pattern=f'^{str(State.CHANGE_MOD)}$')
+                                     pattern=f'^{str(State.CHANGE_MOD)}$')
             ]
         },
         fallbacks=[admin_menu_handler]
@@ -305,4 +349,8 @@ if __name__ == '__main__':
         hello_time
     )
 
-    app.run_polling()
+    try:
+        app.run_polling()
+    finally:
+        cursor.close()
+        conn.close()
