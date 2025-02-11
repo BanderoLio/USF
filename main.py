@@ -5,12 +5,13 @@ import os
 import json
 import pytz
 
+from enum import Enum
 from functools import wraps
-from telegram import Update, Bot
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import MessageLimit, ChatMemberStatus
-from telegram.ext import filters, ApplicationBuilder
+from telegram.ext import filters, ApplicationBuilder, CallbackQueryHandler
 from telegram.ext import MessageHandler, CommandHandler
-from telegram.ext import CallbackContext
+from telegram.ext import CallbackContext, ConversationHandler
 from states import States
 from catgirl import CatgirlDownloader
 
@@ -19,6 +20,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+
+
+class State(Enum):
+    MENU = 0
+    GENERATE = 1
+    SETTINGS = 2
+    CHANGE_MOD = 3
 
 
 def admin_only(func):
@@ -186,9 +194,50 @@ async def fagot(update: Update, context: CallbackContext):
                            text='пока хз')
 
 
+async def main_menu(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("Генерация",
+                              callback_data=str(State.GENERATE))],
+        [InlineKeyboardButton("Настройки (Администрация)",
+                              callback_data=str(State.SETTINGS))]
+    ]
+    markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text('Выберите действие:', reply_markup=markup)
+    return State.MENU
+
+
+async def admin_menu(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("NSFW Кошкодевочки",
+                              callback_data=str(State.SETTINGS))]
+    ]
+    markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text('Выберите действие:', reply_markup=markup)
+    return State.MENU
+
+
+
+async def settings(update: Update, context: CallbackContext):
+    q = update.callback_query
+    await q.answer()
+    keyboard = [
+        [InlineKeyboardButton("Change bool",
+                              callback_data=str(State.CHANGE_MOD))]
+    ]
+    await q.edit_message_text("Z", reply_markup=InlineKeyboardMarkup(keyboard))
+    return State.SETTINGS
+
+
+async def change(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    print("STATE CHANGED ALERT)")
+    await update.callback_query.edit_message_text("Changed")
+
+
 if __name__ == '__main__':
     print(f"Текущая рабочая директория: {os.getcwd()}")
-    TOKEN = os.getenv('TELEGRAM_TOKEN')
+    # TOKEN = os.getenv('TELEGRAM_TOKEN')
+    TOKEN = '7017664204:AAEH1oHU5hWDt4T-HdJu9Tp7a0g9ZMhRRaI'
     app = ApplicationBuilder().token(TOKEN).build()
 
     states = States()
@@ -234,6 +283,22 @@ if __name__ == '__main__':
     app.add_handler(ato_handler)
     app.add_handler(state_handler)
     app.add_handler(fagot_handler)
+
+    admin_menu_handler = CommandHandler('admin_menu', admin_menu)
+    app.add_handler(ConversationHandler(
+        entry_points=[admin_menu_handler],
+        states={
+            State.MENU: [
+                CallbackQueryHandler(settings,
+                                    pattern=f'^{str(State.SETTINGS)}$')
+            ],
+            State.SETTINGS: [
+                CallbackQueryHandler(change,
+                                    pattern=f'^{str(State.CHANGE_MOD)}$')
+            ]
+        },
+        fallbacks=[admin_menu_handler]
+    ))
 
     app.job_queue.run_daily(
         hello_world,
