@@ -4,17 +4,19 @@ import datetime
 import os
 import json
 import pytz
-import psycopg2
+
 
 from enum import Enum
 from functools import wraps
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InputMediaPhoto
 from telegram.constants import MessageLimit, ChatMemberStatus
 from telegram.ext import filters, ApplicationBuilder, CallbackQueryHandler
 from telegram.ext import MessageHandler, CommandHandler
 from telegram.ext import CallbackContext, ConversationHandler
 from states import States
 from catgirl import CatgirlDownloader
+from db import DB
 
 
 logging.basicConfig(
@@ -28,6 +30,19 @@ class State(Enum):
     GENERATE = 1
     SETTINGS = 2
     CHANGE_MOD = 3
+
+
+class GenerateEnum(Enum):
+    CATGIRL = 0
+    FURRY = 1
+    CAT = 2
+
+
+def bind_to_callback(callback, *args, **kwargs):
+    async def bind_(*iargs, **kws):
+        print(f'ARGS: {args, kwargs}\n {iargs, kws}')
+        return await callback(*iargs, *args, **kws, **kwargs)
+    return bind_
 
 
 def admin_only(func):
@@ -46,6 +61,16 @@ def admin_only(func):
             await update.message.reply_text("Эта команда"
                                             " только для администраторов")
             return
+    return wrapped
+
+
+def conversation_endpoint(func):
+    @wraps(func)
+    async def wrapped(update: Update, context: CallbackContext,
+                      *args, **kwargs):
+        q = update.callback_query
+        await q.answer()
+        return await func(update, context, *args, **kwargs)
     return wrapped
 
 
@@ -199,12 +224,51 @@ async def main_menu(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("Генерация",
                               callback_data=str(State.GENERATE))],
-        [InlineKeyboardButton("Настройки (Администрация)",
-                              callback_data=str(State.SETTINGS))]
     ]
     markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Выберите действие:', reply_markup=markup)
+    if q := update.callback_query:
+        await q.answer()
+        await q.edit_message_text("Выберите действие:",
+                                  reply_markup=markup)
+    else:
+        await update.message.reply_text("Выберите действие:",
+                                        reply_markup=markup)
     return State.MENU
+
+
+async def generate(update: Update, context: CallbackContext):
+    q = update.callback_query
+    await q.answer()
+    keyboard = [
+        [InlineKeyboardButton("Кошкодевочки",
+                              callback_data=str(GenerateEnum.CATGIRL))],
+        [InlineKeyboardButton("Фурри",
+                              callback_data=str(GenerateEnum.FURRY))],
+        [InlineKeyboardButton("Кошечки",
+                              callback_data=str(GenerateEnum.CAT))],
+        [InlineKeyboardButton("Назад",
+                              callback_data=str(State.MENU))]
+    ]
+    await q.edit_message_text("Генерировать:",
+                              reply_markup=InlineKeyboardMarkup(keyboard))
+    return State.GENERATE
+
+
+async def get_image(update: Update, context: CallbackContext,
+                    type=GenerateEnum.CATGIRL):
+    q = update.callback_query
+    ans = q.answer()
+    id = update.effective_chat.id
+    nsfw = db.getById('catgirl_nsfw', id)
+    photo = None
+    if type == GenerateEnum.CATGIRL:
+        photo = CatgirlDownloader.get_image(bool(nsfw))
+    elif type == GenerateEnum.FURRY:
+        photo = CatgirlDownloader.get_furry()
+    elif type == GenerateEnum.CAT:
+        photo = CatgirlDownloader.get_cat()
+    await ans
+    await q.edit_message_media(InputMediaPhoto(media=photo))
 
 
 @admin_only
@@ -225,66 +289,47 @@ async def settings(update: Update, context: CallbackContext):
         [InlineKeyboardButton("NSFW Кошкодевочки",
                               callback_data=str(State.CHANGE_MOD))]
     ]
-    await q.edit_message_text("Z", reply_markup=InlineKeyboardMarkup(keyboard))
+    await q.edit_message_text("Настройки:",
+                              reply_markup=InlineKeyboardMarkup(keyboard))
     return State.SETTINGS
 
 
 async def change(update: Update, context: CallbackContext):
     q = update.callback_query
     await q.answer()
-    id = abs(update.effective_chat.id) // 100000
-    nsfw = True
-    try:
-        cursor.execute(f"SELECT catgirl_nsfw FROM ztable WHERE id = {id}")
-        nsfw = cursor.fetchone()
-    except Exception:
-        ...
+    id = update.effective_chat.id
+    nsfw = db.getById('catgirl_nsfw', id)
+    logging.info(f'INFO:: {nsfw}')
+    if nsfw is None:
+        nsfw = True
     nsfw = not nsfw
-    try:
-        cursor.execute(f"INSERT INTO ztable (id, catgirl_nsfw) VALUES"
-                             f"({id}, {nsfw}) ON CONFLICT (id) DO UPDATE SET"
-                             f" catgirl_nsfw = EXCLUDED.catgirl_nsfw",
-                            )
-        conn.commit()
-        await q.edit_message_text(f"Кошкодевочки++"
-                                  f"в{"" if nsfw else "ы"}ключены")
-    except psycopg2.Error as e:
-        conn.rollback()
-        print(f'Ошибка: {e}')
+    db.setById(id, catgirl_nsfw=nsfw)
+    await q.edit_message_text(f"Кошкодевочки круче"
+                              f" в{"" if nsfw else "ы"}ключены")
 
+
+async def end_conversation(update: Update, context: CallbackContext):
+    q = update.callback_query
+    await q.answer()
+    return ConversationHandler.END
+
+
+async def restart(update: Update, context: CallbackContext):
+    return await main_menu(update, context)
 
 if __name__ == '__main__':
     dbname = os.getenv("POSTGRES_DB")
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD")
     assert (dbname and user and password)
-
-    conn = psycopg2.connect(
-        dbname=dbname,
-        user=user,
-        password=password,
-        host='db',
-        port='5432'
-    )
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ztable (
-    id BIGSERIAL PRIMARY KEY,
-    points TEXT[] DEFAULT '{}',
-    catgirl_nsfw BOOLEAN NOT NULL DEFAULT FALSE
-    )
-""")
-
-    conn.commit()
+    db = DB(dbname, user, password)
 
     print(f"Текущая рабочая директория: {os.getcwd()}")
     # TOKEN = os.getenv('TELEGRAM_TOKEN')
     TOKEN = '7017664204:AAEH1oHU5hWDt4T-HdJu9Tp7a0g9ZMhRRaI'
     app = ApplicationBuilder().token(TOKEN).build()
 
-    states = States()
+    states = States(db)
 
     schedule = None
     with open("schedule.json") as f:
@@ -343,6 +388,30 @@ if __name__ == '__main__':
         },
         fallbacks=[admin_menu_handler]
     ))
+    main_menu_handler = CommandHandler('menu', main_menu)
+    app.add_handler(ConversationHandler(
+        entry_points=[main_menu_handler],
+        states={
+            State.MENU: [
+                CallbackQueryHandler(generate,
+                                     pattern=f'^{str(State.GENERATE)}$')
+            ],
+            State.GENERATE: [
+                CallbackQueryHandler(bind_to_callback(get_image,
+                                     type=GenerateEnum.CATGIRL),
+                                     pattern=f'^{str(GenerateEnum.CATGIRL)}$'),
+                CallbackQueryHandler(bind_to_callback(get_image,
+                                                      type=GenerateEnum.FURRY),
+                                     pattern=f'^{str(GenerateEnum.FURRY)}$'),
+                CallbackQueryHandler(bind_to_callback(get_image,
+                                                      type=GenerateEnum.CAT),
+                                     pattern=f'^{str(GenerateEnum.CAT)}$'),
+                CallbackQueryHandler(main_menu,
+                                     pattern=f'^{str(State.MENU)}$')
+            ],
+        },
+        fallbacks=[main_menu_handler]
+    ))
 
     app.job_queue.run_daily(
         hello_world,
@@ -352,5 +421,4 @@ if __name__ == '__main__':
     try:
         app.run_polling()
     finally:
-        cursor.close()
-        conn.close()
+        ...
