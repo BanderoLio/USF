@@ -325,8 +325,7 @@ if __name__ == '__main__':
     db = DB(dbname, user, password)
 
     print(f"Текущая рабочая директория: {os.getcwd()}")
-    # TOKEN = os.getenv('TELEGRAM_TOKEN')
-    TOKEN = '7017664204:AAEH1oHU5hWDt4T-HdJu9Tp7a0g9ZMhRRaI'
+    TOKEN = os.getenv('TELEGRAM_TOKEN')
     app = ApplicationBuilder().token(TOKEN).build()
 
     states = States(db)
