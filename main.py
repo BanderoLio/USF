@@ -30,6 +30,9 @@ class State(Enum):
     GENERATE = 1
     SETTINGS = 2
     CHANGE_MOD = 3
+    POINTS = 4
+    SCHEDULE = 5
+    NOW = 6
 
 
 class GenerateEnum(Enum):
@@ -142,9 +145,13 @@ async def furry(update: Update, context: CallbackContext):
 
 async def schedule_callback(update: Update, context: CallbackContext):
     bot: Bot = context.bot
-    await bot.send_message(update.effective_chat.id,
-                           f'РАСПОРЯДОК ДНЯ ФОНАТА ЮСФ\n'
-                           f'{'\n'.join([' '.join(p) for p in schedule])}')
+    s = f'РАСПОРЯДОК ДНЯ ФОНАТА ЮСФ\n' \
+        f'{'\n'.join([' '.join(p) for p in schedule])}'
+    if q := update.callback_query:
+        await q.answer()
+        await q.edit_message_text(s)
+    else:
+        await bot.send_message(update.effective_chat.id, s)
 
 
 async def whatsnow(update: Update, context: CallbackContext):
@@ -165,15 +172,24 @@ async def whatsnow(update: Update, context: CallbackContext):
     key = key.hour * 100 + key.minute
     pos = find_pos([int(x[0].split(':')[0]) * 100 + int(x[0].split(':')[1])
                     for x in schedule], key)
-    await bot.send_message(update.effective_chat.id, ' '.join(schedule[pos]))
+    if q := update.callback_query:
+        await q.answer()
+        await q.edit_message_text(' '.join(schedule[pos]))
+    else:
+        await bot.send_message(update.effective_chat.id,
+                               ' '.join(schedule[pos]))
 
 
 async def states_callback(update: Update, context: CallbackContext):
     id = update.effective_chat.id
     s = "\n".join(f'{i+1}. {state}' for i, state in enumerate(states(id)))
     max_len = MessageLimit.MAX_TEXT_LENGTH.value
-    await context.bot.send_message(chat_id=update.effective_chat.id,
-                                   text='Ну что, опять в копатель?')
+    if q := update.callback_query:
+        await q.answer()
+        await q.edit_message_text('Ну что, опять в копатель?')
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text='Ну что, опять в копатель?')
     for i in range(len(s) // max_len + (1 if len(s) % max_len else 0)):
         await context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=s[i*max_len:min((i+1)*max_len,
@@ -225,7 +241,14 @@ async def main_menu(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("Генерация",
                               callback_data=str(State.GENERATE))],
-    ]
+        [InlineKeyboardButton("Пункты",
+                              callback_data=str(State.POINTS))],
+        [InlineKeyboardButton("Расписание",
+                              callback_data=str(State.SCHEDULE))],
+        [InlineKeyboardButton("Что сейчас",
+                              callback_data=str(State.NOW))]
+        ]
+
     markup = InlineKeyboardMarkup(keyboard)
     if q := update.callback_query:
         await q.answer()
@@ -394,7 +417,13 @@ if __name__ == '__main__':
         states={
             State.MENU: [
                 CallbackQueryHandler(generate,
-                                     pattern=f'^{str(State.GENERATE)}$')
+                                     pattern=f'^{str(State.GENERATE)}$'),
+                CallbackQueryHandler(states_callback,
+                                     pattern=f'^{str(State.POINTS)}$'),
+                CallbackQueryHandler(schedule_callback,
+                                     pattern=f'^{str(State.SCHEDULE)}$'),
+                CallbackQueryHandler(whatsnow,
+                                     pattern=f'^{str(State.NOW)}$')
             ],
             State.GENERATE: [
                 CallbackQueryHandler(bind_to_callback(get_image,
