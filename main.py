@@ -9,7 +9,7 @@ import pytz
 from enum import Enum
 from functools import wraps
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram import InputMediaPhoto
+from telegram import InputMediaPhoto, Chat
 from telegram.constants import MessageLimit, ChatMemberStatus
 from telegram.ext import filters, ApplicationBuilder, CallbackQueryHandler
 from telegram.ext import MessageHandler, CommandHandler
@@ -57,8 +57,11 @@ def admin_only(func):
             user_id=update.effective_user.id
         )
 
-        if user.status in [ChatMemberStatus.ADMINISTRATOR,
-                           ChatMemberStatus.OWNER]:
+        if (
+            user.status in [ChatMemberStatus.ADMINISTRATOR,
+                            ChatMemberStatus.OWNER]
+            or update.effective_chat.type == Chat.PRIVATE
+        ):
             return await func(update, context, *args, **kwargs)
         else:
             await update.message.reply_text("Эта команда"
@@ -325,7 +328,7 @@ async def change(update: Update, context: CallbackContext):
     nsfw = db.getById('catgirl_nsfw', id)
     logging.info(f'INFO:: {nsfw}')
     if nsfw is None:
-        nsfw = True
+        nsfw = False
     nsfw = not nsfw
     db.setById(id, catgirl_nsfw=nsfw)
     await q.edit_message_text(f"Кошкодевочки круче"
