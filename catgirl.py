@@ -5,7 +5,7 @@ from random import randint
 
 
 class CatgirlDownloader:
-    __endpoint = "https://nekos.moe/api/v1/random/image?nsfw=" 
+    __endpoint = "https://nekos.moe/api/v1/random/image?nsfw="
 
     @staticmethod
     def get_page(nsfw=False):
@@ -24,8 +24,18 @@ class CatgirlDownloader:
 
     @staticmethod
     def get_image(nsfw=False):
-        r = requests.get(CatgirlDownloader.get_page_url(
-            CatgirlDownloader.get_page(nsfw)),
+        url = None
+        if nsfw and randint(0, 100) <= 75:
+            res = requests.get("https://api.nekosapi.com/v4/images/random?"
+                               "rating=suggestive,borderline,explicit&"
+                               "tags=kemonomimi", timeout=15)
+            res.raise_for_status()
+            url = res.json()[0]['url']
+        else:
+            url = CatgirlDownloader.get_page_url(
+                CatgirlDownloader.get_page(nsfw)
+            )
+        r = requests.get(url,
                          timeout=15)
         return r.content
 

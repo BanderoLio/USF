@@ -2,7 +2,7 @@ import psycopg2
 import atexit
 import logging
 
-from psycopg2.extensions import register_adapter, AsIs 
+from psycopg2.extensions import register_adapter, AsIs
 from singleton import Singleton
 
 
@@ -22,7 +22,7 @@ class DB(metaclass=Singleton):
             host=host,
             port=port
         )
-        self.cursor = self.conn.cursor() 
+        self.cursor = self.conn.cursor()
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS xtable (
             id BIGSERIAL PRIMARY KEY,
