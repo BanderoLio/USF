@@ -4,6 +4,7 @@ import datetime
 import os
 import json
 import pytz
+import asyncio
 
 
 from enum import Enum
@@ -39,6 +40,9 @@ class GenerateEnum(Enum):
     CATGIRL = 0
     FURRY = 1
     CAT = 2
+
+
+db_lock = asyncio.Lock()
 
 
 def bind_to_callback(callback, *args, **kwargs):
@@ -94,37 +98,40 @@ async def hello_world(context: CallbackContext):
 
 @admin_only
 async def add(update: Update, context: CallbackContext):
-    id = update.effective_chat.id
-    s = update.message.text
-    if ' ' not in s:
-        return
-    s = s[s.find(' ') + 1:]
-    print(f'{s} ::to add')
-    states(id).append(s)
-    states.save(id)
+    async with db_lock:
+        id = update.effective_chat.id
+        s = update.message.text
+        if ' ' not in s:
+            return
+        s = s[s.find(' ') + 1:]
+        print(f'{s} ::to add')
+        states(id).append(s)
+        states.save(id)
 
-    await context.bot.send_message(chat_id=update.effective_chat.id,
-                                   text=f'Пункт {len(states(id))} добавлен')
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text=f'Пункт {len(states(id))} '
+                                            f'добавлен')
 
 
 @admin_only
 async def remove(update: Update, context: CallbackContext):
-    id = update.effective_chat.id
-    s = update.message.text
-    if ' ' not in s:
-        return
-    s = s[s.find(' ') + 1:].strip()
+    async with db_lock:
+        id = update.effective_chat.id
+        s = update.message.text
+        if ' ' not in s:
+            return
+        s = s[s.find(' ') + 1:].strip()
 
-    if not s.isdigit():
-        return
-    s = int(s) - 1
-    if not 0 < s < len(states(id)):
-        return
-    states(id).pop(s)
-    print(f'{s} ::to remove')
-    states.save(id)
-    await context.bot.send_message(chat_id=update.effective_chat.id,
-                                   text=f'Пункт {s+1} был удалён')
+        if not s.isdigit():
+            return
+        s = int(s) - 1
+        if not 0 < s < len(states(id)):
+            return
+        states(id).pop(s)
+        print(f'{s} ::to remove')
+        states.save(id)
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text=f'Пункт {s+1} был удалён')
 
 
 async def catgirl(update: Update, context: CallbackContext):
@@ -322,17 +329,18 @@ async def settings(update: Update, context: CallbackContext):
 
 
 async def change(update: Update, context: CallbackContext):
-    q = update.callback_query
-    await q.answer()
-    id = update.effective_chat.id
-    nsfw = db.getById('catgirl_nsfw', id)
-    logging.info(f'INFO:: {nsfw}')
-    if nsfw is None:
-        nsfw = False
-    nsfw = not nsfw
-    db.setById(id, catgirl_nsfw=nsfw)
-    await q.edit_message_text(f"Кошкодевочки круче"
-                              f" в{"" if nsfw else "ы"}ключены")
+    async with db_lock:
+        q = update.callback_query
+        await q.answer()
+        id = update.effective_chat.id
+        nsfw = db.getById('catgirl_nsfw', id)
+        logging.info(f'INFO:: {nsfw}')
+        if nsfw is None:
+            nsfw = False
+        nsfw = not nsfw
+        db.setById(id, catgirl_nsfw=nsfw)
+        await q.edit_message_text(f"Кошкодевочки круче"
+                                  f" в{"" if nsfw else "ы"}ключены")
 
 
 async def end_conversation(update: Update, context: CallbackContext):
@@ -353,7 +361,7 @@ if __name__ == '__main__':
 
     print(f"Текущая рабочая директория: {os.getcwd()}")
     TOKEN = os.getenv('TELEGRAM_TOKEN')
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().concurrent_updates(True).token(TOKEN).build()
 
     states = States(db)
 

@@ -25,7 +25,7 @@ class CatgirlDownloader:
     @staticmethod
     def get_image(nsfw=False):
         url = None
-        if nsfw and randint(0, 100) <= 75:
+        if nsfw and randint(0, 100) <= 50:
             res = requests.get("https://api.nekosapi.com/v4/images/"
                                "random?rating=suggestive,borderline&"
                                "tags=kemonomimi,girl&limit=1", timeout=15)
