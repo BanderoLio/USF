@@ -35,13 +35,19 @@ class CatgirlDownloader:
             url = CatgirlDownloader.get_page_url(
                 CatgirlDownloader.get_page(nsfw)
             )
-        r = requests.get(url,
-                         timeout=15)
-        return r.content
+        try:
+            r = requests.get(url,
+                             timeout=15)
+            return r.content
+        except Exception:
+            ...
 
     @staticmethod
     def get_cat():
-        return requests.get("https://cataas.com/cat", timeout=15).content
+        try:
+            return requests.get("https://cataas.com/cat", timeout=15).content
+        except Exception:
+            ...
 
     @staticmethod
     def get_furry():
@@ -50,4 +56,7 @@ class CatgirlDownloader:
         r = requests.get(s, timeout=15)
         page = json.loads(r.text)
         url = page['images'][0]['representations']['full']
-        return requests.get(url, timeout=15).content
+        try:
+            return requests.get(url, timeout=15).content
+        except Exception:
+            ...
