@@ -7,10 +7,14 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - PGPORT=5051
+    depends_on:
+      - db
     ports:
       - "8000:8000"
   db:
     image: postgres:latest
+    container_name: db
+    restart: always
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
