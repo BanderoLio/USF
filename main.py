@@ -357,7 +357,7 @@ if __name__ == '__main__':
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD")
     assert (dbname and user and password)
-    db = DB(dbname, user, password, 5051)
+    db = DB(dbname, user, password, port='5051')
 
     print(f"Текущая рабочая директория: {os.getcwd()}")
     TOKEN = os.getenv('TELEGRAM_TOKEN')
