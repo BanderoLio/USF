@@ -25,38 +25,54 @@ class CatgirlDownloader:
     @staticmethod
     def get_image(nsfw=False):
         url = None
-        if nsfw and randint(0, 100) <= 50:
-            res = requests.get("https://api.nekosapi.com/v4/images/"
-                               "random?rating=suggestive,borderline&"
-                               "tags=kemonomimi,girl&limit=1", timeout=15)
-            res.raise_for_status()
-            url = res.json()[0]['url']
-        else:
-            url = CatgirlDownloader.get_page_url(
-                CatgirlDownloader.get_page(nsfw)
-            )
         try:
-            r = requests.get(url,
-                             timeout=15)
+            if nsfw:
+                res = requests.get("https://api.nekosapi.com/v4/images/"
+                                "random?rating=explicit,borderline,suggestive&"
+                                "tags=kemonomimi,girl&limit=1", timeout=15)
+                res.raise_for_status()
+                url = res.json()[0]['url']
+            else:
+                res = requests.get("https://api.nekosapi.com/v4/images/"
+                                "random?rating=safe&suggestive&"
+                                "tags=kemonomimi,girl&limit=1", timeout=15)
+                res.raise_for_status()
+                url = res.json()[0]['url']
+                
+            if url is None:
+                return None
+            
+            r = requests.get(url, timeout=15)
+            r.raise_for_status()
             return r.content
-        except Exception:
-            ...
+        except Exception as e:
+            print(f"Error in get_image: {e}")
+            return None
 
     @staticmethod
     def get_cat():
         try:
-            return requests.get("https://cataas.com/cat", timeout=15).content
-        except Exception:
-            ...
+            r = requests.get("https://cataas.com/cat", timeout=15)
+            r.raise_for_status()
+            return r.content
+        except Exception as e:
+            print(f"Error in get_cat: {e}")
+            return None
 
     @staticmethod
     def get_furry():
-        s = f'https://furbooru.org/api/v1/json/search/images' \
-            f'?per_page=1&page={randint(1, 24000)}&q=safe,female,oc+only'
-        r = requests.get(s, timeout=15)
-        page = json.loads(r.text)
-        url = page['images'][0]['representations']['full']
         try:
-            return requests.get(url, timeout=15).content
-        except Exception:
-            ...
+            s = f'https://furbooru.org/api/v1/json/search/images' \
+                f'?per_page=1&page={randint(1, 24000)}&q=safe,female,oc+only'
+            r = requests.get(s, timeout=15)
+            r.raise_for_status()
+            page = json.loads(r.text)
+            if not page.get('images') or len(page['images']) == 0:
+                return None
+            url = page['images'][0]['representations']['full']
+            img_r = requests.get(url, timeout=15)
+            img_r.raise_for_status()
+            return img_r.content
+        except Exception as e:
+            print(f"Error in get_furry: {e}")
+            return None

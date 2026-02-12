@@ -137,20 +137,104 @@ async def remove(update: Update, context: CallbackContext):
 async def catgirl(update: Update, context: CallbackContext):
     bot: Bot = context.bot
     nsfw = db.getById('catgirl_nsfw', update.effective_chat.id)
-    await bot.send_photo(update.effective_chat.id,
-                         CatgirlDownloader.get_image(bool(nsfw)))
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            photo = CatgirlDownloader.get_image(bool(nsfw))
+            if photo is None:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                await bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Не удалось загрузить изображение. Попробуйте позже."
+                )
+                return
+            await bot.send_photo(
+                update.effective_chat.id,
+                photo,
+                read_timeout=30,
+                write_timeout=30,
+                connect_timeout=30
+            )
+            return
+        except Exception as e:
+            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                await bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Произошла ошибка при отправке изображения. Попробуйте позже."
+                )
 
 
 async def jcat(update: Update, context: CallbackContext):
     bot: Bot = context.bot
-    await bot.send_photo(update.effective_chat.id,
-                         CatgirlDownloader.get_cat())
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            photo = CatgirlDownloader.get_cat()
+            if photo is None:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                await bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Не удалось загрузить изображение. Попробуйте позже."
+                )
+                return
+            await bot.send_photo(
+                update.effective_chat.id,
+                photo,
+                read_timeout=30,
+                write_timeout=30,
+                connect_timeout=30
+            )
+            return
+        except Exception as e:
+            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                await bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Произошла ошибка при отправке изображения. Попробуйте позже."
+                )
 
 
 async def furry(update: Update, context: CallbackContext):
     bot: Bot = context.bot
-    await bot.send_photo(update.effective_chat.id,
-                         CatgirlDownloader.get_furry())
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            photo = CatgirlDownloader.get_furry()
+            if photo is None:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                await bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Не удалось загрузить изображение. Попробуйте позже."
+                )
+                return
+            await bot.send_photo(
+                update.effective_chat.id,
+                photo,
+                read_timeout=30,
+                write_timeout=30,
+                connect_timeout=30
+            )
+            return
+        except Exception as e:
+            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                await bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Произошла ошибка при отправке изображения. Попробуйте позже."
+                )
 
 
 async def schedule_callback(update: Update, context: CallbackContext):
@@ -221,6 +305,8 @@ async def state(update: Update, context: CallbackContext):
 
 
 async def info(update: Update, context: CallbackContext):
+    if not update.message or not update.message.text:
+        return
     s = update.message.text.lstrip()
     idx = len("инфа") + 1
     bot: Bot = context.bot
@@ -295,14 +381,34 @@ async def get_image(update: Update, context: CallbackContext,
     id = update.effective_chat.id
     nsfw = db.getById('catgirl_nsfw', id)
     photo = None
-    if type == GenerateEnum.CATGIRL:
-        photo = CatgirlDownloader.get_image(bool(nsfw))
-    elif type == GenerateEnum.FURRY:
-        photo = CatgirlDownloader.get_furry()
-    elif type == GenerateEnum.CAT:
-        photo = CatgirlDownloader.get_cat()
-    await ans
-    await q.edit_message_media(InputMediaPhoto(media=photo))
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            if type == GenerateEnum.CATGIRL:
+                photo = CatgirlDownloader.get_image(bool(nsfw))
+            elif type == GenerateEnum.FURRY:
+                photo = CatgirlDownloader.get_furry()
+            elif type == GenerateEnum.CAT:
+                photo = CatgirlDownloader.get_cat()
+            
+            if photo is None:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                await ans
+                await q.edit_message_text("Не удалось загрузить изображение. Попробуйте позже.")
+                return
+            
+            await ans
+            await q.edit_message_media(InputMediaPhoto(media=photo))
+            return
+        except Exception as e:
+            logging.error(f"Error getting/sending image (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                await ans
+                await q.edit_message_text("Произошла ошибка при загрузке изображения. Попробуйте позже.")
 
 
 @admin_only
@@ -457,6 +563,21 @@ if __name__ == '__main__':
         hello_world,
         hello_time
     )
+
+    async def error_handler(update: Update, context: CallbackContext):
+        """Глобальный обработчик ошибок"""
+        logging.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+        
+        if update and update.effective_chat:
+            try:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Произошла ошибка при обработке запроса. Попробуйте позже."
+                )
+            except Exception:
+                pass
+
+    app.add_error_handler(error_handler)
 
     try:
         app.run_polling()

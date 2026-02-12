@@ -1,3 +1,4 @@
+version: '3.3'
 services:
   app:
     build: .
@@ -10,9 +11,9 @@ services:
     depends_on:
       - db
     ports:
-      - "8000:8000"
+      - '8000:8000'
   db:
-    image: postgres:latest
+    image: postgres:16
     container_name: db
     restart: always
     environment:
@@ -22,7 +23,7 @@ services:
       - PGPORT=5051
       - POSTGRES_PORT=5051
     ports:
-      - "5051:5051"
+      - '5051:5051'
     expose:
       - 5051
     volumes:
