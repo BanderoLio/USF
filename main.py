@@ -12,9 +12,11 @@ from functools import wraps
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import InputMediaPhoto, Chat
 from telegram.constants import MessageLimit, ChatMemberStatus
+from telegram.error import TimedOut, NetworkError
 from telegram.ext import filters, ApplicationBuilder, CallbackQueryHandler
 from telegram.ext import MessageHandler, CommandHandler
 from telegram.ext import CallbackContext, ConversationHandler
+from telegram.request import HTTPXRequest
 from states import States
 from catgirl import CatgirlDownloader
 from db import DB
@@ -140,7 +142,12 @@ async def catgirl(update: Update, context: CallbackContext):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            photo = CatgirlDownloader.get_image(bool(nsfw))
+            loop = asyncio.get_event_loop()
+            photo = await loop.run_in_executor(
+                None, 
+                CatgirlDownloader.get_image, 
+                bool(nsfw)
+            )
             if photo is None:
                 if attempt < max_retries - 1:
                     await asyncio.sleep(1)
@@ -153,20 +160,35 @@ async def catgirl(update: Update, context: CallbackContext):
             await bot.send_photo(
                 update.effective_chat.id,
                 photo,
-                read_timeout=30,
-                write_timeout=30,
+                read_timeout=60,
+                write_timeout=60,
                 connect_timeout=30
             )
             return
-        except Exception as e:
-            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
+        except (TimedOut, NetworkError) as e:
+            logging.error(f"Network error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(2)
             else:
-                await bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text="Произошла ошибка при отправке изображения. Попробуйте позже."
-                )
+                try:
+                    await bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Превышено время ожидания при отправке изображения. Попробуйте позже."
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}", exc_info=True)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                try:
+                    await bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Произошла ошибка при отправке изображения. Попробуйте позже."
+                    )
+                except Exception:
+                    pass
 
 
 async def jcat(update: Update, context: CallbackContext):
@@ -174,7 +196,8 @@ async def jcat(update: Update, context: CallbackContext):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            photo = CatgirlDownloader.get_cat()
+            loop = asyncio.get_event_loop()
+            photo = await loop.run_in_executor(None, CatgirlDownloader.get_cat)
             if photo is None:
                 if attempt < max_retries - 1:
                     await asyncio.sleep(1)
@@ -187,20 +210,35 @@ async def jcat(update: Update, context: CallbackContext):
             await bot.send_photo(
                 update.effective_chat.id,
                 photo,
-                read_timeout=30,
-                write_timeout=30,
+                read_timeout=60,
+                write_timeout=60,
                 connect_timeout=30
             )
             return
-        except Exception as e:
-            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
+        except (TimedOut, NetworkError) as e:
+            logging.error(f"Network error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(2)
             else:
-                await bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text="Произошла ошибка при отправке изображения. Попробуйте позже."
-                )
+                try:
+                    await bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Превышено время ожидания при отправке изображения. Попробуйте позже."
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}", exc_info=True)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                try:
+                    await bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Произошла ошибка при отправке изображения. Попробуйте позже."
+                    )
+                except Exception:
+                    pass
 
 
 async def furry(update: Update, context: CallbackContext):
@@ -208,7 +246,8 @@ async def furry(update: Update, context: CallbackContext):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            photo = CatgirlDownloader.get_furry()
+            loop = asyncio.get_event_loop()
+            photo = await loop.run_in_executor(None, CatgirlDownloader.get_furry)
             if photo is None:
                 if attempt < max_retries - 1:
                     await asyncio.sleep(1)
@@ -221,20 +260,35 @@ async def furry(update: Update, context: CallbackContext):
             await bot.send_photo(
                 update.effective_chat.id,
                 photo,
-                read_timeout=30,
-                write_timeout=30,
+                read_timeout=60,
+                write_timeout=60,
                 connect_timeout=30
             )
             return
-        except Exception as e:
-            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
+        except (TimedOut, NetworkError) as e:
+            logging.error(f"Network error sending photo (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(2)
             else:
-                await bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text="Произошла ошибка при отправке изображения. Попробуйте позже."
-                )
+                try:
+                    await bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Превышено время ожидания при отправке изображения. Попробуйте позже."
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            logging.error(f"Error sending photo (attempt {attempt + 1}/{max_retries}): {e}", exc_info=True)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                try:
+                    await bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text="Произошла ошибка при отправке изображения. Попробуйте позже."
+                    )
+                except Exception:
+                    pass
 
 
 async def schedule_callback(update: Update, context: CallbackContext):
@@ -384,12 +438,18 @@ async def get_image(update: Update, context: CallbackContext,
     max_retries = 3
     for attempt in range(max_retries):
         try:
+            # Загружаем изображение в отдельном потоке
+            loop = asyncio.get_event_loop()
             if type == GenerateEnum.CATGIRL:
-                photo = CatgirlDownloader.get_image(bool(nsfw))
+                photo = await loop.run_in_executor(
+                    None, 
+                    CatgirlDownloader.get_image, 
+                    bool(nsfw)
+                )
             elif type == GenerateEnum.FURRY:
-                photo = CatgirlDownloader.get_furry()
+                photo = await loop.run_in_executor(None, CatgirlDownloader.get_furry)
             elif type == GenerateEnum.CAT:
-                photo = CatgirlDownloader.get_cat()
+                photo = await loop.run_in_executor(None, CatgirlDownloader.get_cat)
             
             if photo is None:
                 if attempt < max_retries - 1:
@@ -402,8 +462,15 @@ async def get_image(update: Update, context: CallbackContext,
             await ans
             await q.edit_message_media(InputMediaPhoto(media=photo))
             return
+        except (TimedOut, NetworkError) as e:
+            logging.error(f"Network error getting/sending image (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2)
+            else:
+                await ans
+                await q.edit_message_text("Превышено время ожидания. Попробуйте позже.")
         except Exception as e:
-            logging.error(f"Error getting/sending image (attempt {attempt + 1}/{max_retries}): {e}")
+            logging.error(f"Error getting/sending image (attempt {attempt + 1}/{max_retries}): {e}", exc_info=True)
             if attempt < max_retries - 1:
                 await asyncio.sleep(2)
             else:
@@ -467,7 +534,15 @@ if __name__ == '__main__':
 
     print(f"Текущая рабочая директория: {os.getcwd()}")
     TOKEN = os.getenv('TELEGRAM_TOKEN')
-    app = ApplicationBuilder().concurrent_updates(True).token(TOKEN).build()
+    
+    request = HTTPXRequest(
+        read_timeout=60,
+        write_timeout=60,
+        connect_timeout=30,
+        pool_timeout=30
+    )
+    
+    app = ApplicationBuilder().concurrent_updates(True).token(TOKEN).request(request).build()
 
     states = States(db)
 
@@ -566,7 +641,11 @@ if __name__ == '__main__':
 
     async def error_handler(update: Update, context: CallbackContext):
         """Глобальный обработчик ошибок"""
-        logging.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+        error = context.error
+        logging.error(f"Exception while handling an update: {error}", exc_info=error)
+        
+        if isinstance(error, (TimedOut, NetworkError)):
+            return
         
         if update and update.effective_chat:
             try:
